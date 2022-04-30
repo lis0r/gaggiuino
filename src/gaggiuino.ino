@@ -1,4 +1,3 @@
-#define SINGLE_HX711_CLOCK
 #if defined(ARDUINO_ARCH_AVR)
   #include <EEPROM.h>
 #elif defined(ARDUINO_ARCH_STM32)
@@ -93,13 +92,7 @@ EasyNex myNex(USART_CH);
 //Banoz PSM - for more cool shit visit https://github.com/banoz  and don't forget to star
 PSM pump(zcPin, dimmerPin, PUMP_RANGE, ZC_MODE);
 //#######################__HX711_stuff__##################################
-#if defined(SINGLE_HX711_CLOCK)
 HX711_2 LoadCells;
-#else
-HX711 LoadCell_1; //HX711 1
-HX711 LoadCell_2; //HX711 2
-#endif
-
 
 //##################__FLASH_storage_stuff__##################################
 #if defined(ARDUINO_ARCH_STM32)
@@ -292,13 +285,9 @@ void calculateWeight() {
     if (scalesPresent && weighingStartRequested) {
       // Stop pump to prevent HX711 critical section from breaking timing
       //pump.set(0);
-      #if defined(SINGLE_HX711_CLOCK)
-        float values[2];
-        LoadCells.get_units(values);
-        currentWeight = values[0] + values[1];
-      #else
-        currentWeight = LoadCell_1.get_units() + LoadCell_2.get_units();
-      #endif
+      float values[2];
+      LoadCells.get_units(values);
+      currentWeight = values[0] + values[1];
       // Resume pumping
       //pump.set(pumpValue);
     }
@@ -1077,9 +1066,7 @@ void brewDetect() {
 }
 
 void scalesInit() {
-
-  #if defined(SINGLE_HX711_CLOCK)
-    LoadCells.begin(HX711_dout_1, HX711_dout_2, HX711_sck_1);
+    LoadCells.begin(HX711_dout_1, HX711_dout_2, HX711_sck_1, HX711_sck_2);
     LoadCells.set_scale(scalesF1, scalesF2);
     LoadCells.power_up();
 
@@ -1089,32 +1076,11 @@ void scalesInit() {
       LoadCells.tare(5);
       scalesPresent = true;
     }
-  #else
-    LoadCell_1.begin(HX711_dout_1, HX711_sck_1);
-    LoadCell_2.begin(HX711_dout_2, HX711_sck_2);
-    LoadCell_1.set_scale(scalesF1); // calibrated val1
-    LoadCell_2.set_scale(scalesF2); // calibrated val2
-
-    delay(500);
-    
-    if (LoadCell_1.is_ready() && LoadCell_2.is_ready()) {
-      scalesPresent = true;
-      LoadCell_1.tare();
-      LoadCell_2.tare();
-    }
-  #endif
 }
 
 void scalesTare() {
   if( scalesPresent && (!tareDone || !previousBrewState) ) {
-    #if defined(SINGLE_HX711_CLOCK)
-      if (LoadCells.is_ready()) LoadCells.tare(5);
-    #else
-      if (LoadCell_1.wait_ready_timeout(300) && LoadCell_2.wait_ready_timeout(300)) {
-        LoadCell_1.tare(2);
-        LoadCell_2.tare(2);
-      }
-    #endif
+    if (LoadCells.is_ready()) LoadCells.tare(5);
     tareDone=1;
     previousBrewState=1;
   }
